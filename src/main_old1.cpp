@@ -114,24 +114,10 @@ int main() {
           std::cout << "prev_size : " << prev_size << std::endl;
           
           // if previous path exists
-          double car_s_now = car_s;
           if (prev_size > 0)
           {
             car_s = end_path_s;
-          }
-          
-          // trajectory costs
-          // costs[0]：left lane
-          // costs[1]：middle lane
-          // costs[2]：right lane
-          vector<double> costs{0,0,0};
-          
-          if (lane==0){
-            costs[2]=999;
-          }else if (lane==2)
-          {
-            costs[0]=999;
-          }
+          }   
           
           // sensing aroud
           bool left_lane = true;
@@ -139,42 +125,44 @@ int main() {
           for (int i = 0; i < sensor_fusion.size(); i++)
           {
             float d = sensor_fusion[i][6];
+            std::cout << "d : " << d << std::endl;
             float s = sensor_fusion[i][5];
-            double vx = sensor_fusion[i][3];
-            double vy = sensor_fusion[i][4];
-            double check_speed = sqrt(vx*vx+vy*vy);
-            std::cout << "i : " << i << ", d : " << d << ", s : " << s << ", v : " << check_speed << std::endl;
-            double check_car_s = sensor_fusion[i][5];
-            
-            // predict front car's position in future
-            check_car_s += ((double)prev_size*.02*check_speed);
             
             // left lane sensing
-            if ( abs(s - car_s_now) < 30 && d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2) )
+            if (abs(s - car_s) < 60 &&  d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2) )
             {
-              if ((lane-1)>=0)
-              {
-                costs[lane-1] = costs[lane-1]+20;
-              }
+              left_lane = false;
             }
             
             // right lane sensing
-            if ( abs(s - car_s_now) < 30 &&  d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2) )
+            if (abs(s - car_s) < 60 &&  d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2) )
             {
-              if (lane+1<=2)
-              {
-                costs[lane+1] = costs[lane+1]+20;
-              }
+              right_lane = false;
             }
             
             // current lane sensing
-            if ( d < (2+(4*lane)+2) && d > (2+(4*lane)-2) )
-            { 
+            if ( d < (2+4*lane+2) && d > (2+4*lane-2) )
+            {
+              double vx = sensor_fusion[i][3];
+              double vy = sensor_fusion[i][4];
+              double check_speed = sqrt(vx*vx+vy*vy);
+              double check_car_s = sensor_fusion[i][5];
+              
+              // ???
+              check_car_s += ((double)prev_size*.02*check_speed);
+              
               // other vehicle exists in front of and near ego vehicle 
-              if ( check_car_s > car_s && (check_car_s - car_s) < 30 ) 
+              if ( (check_car_s > car_s) && ((check_car_s - car_s) < 30 )) 
               {
-                costs[lane] = costs[lane]+10;
                 too_close = true;
+                if (left_lane == true && lane >= 1)
+                { 
+                  lane = lane - 1;
+                }
+                else if (right_lane == true && lane <= 1)
+                { 
+                  lane = lane + 1;
+                }
               }
             }
           }
@@ -235,7 +223,7 @@ int main() {
               double ref_y_prev = previous_path_y[prev_size-2];
               ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
               
-              //std::cout << "ref_yaw : " << ref_yaw << std::endl;
+              std::cout << "ref_yaw : " << ref_yaw << std::endl;
               
               ptsx.push_back(ref_x_prev);
               ptsx.push_back(ref_x);
@@ -263,9 +251,9 @@ int main() {
               double shift_y = ptsy[i] - ref_y;
               
               ptsx[i] = ( shift_x * cos(0-ref_yaw) ) - (shift_y * sin(0-ref_yaw) );
-              //std::cout << "stpx[" << i << "] : " << ptsx[i] << std::endl;
+              std::cout << "stpx[" << i << "] : " << ptsx[i] << std::endl;
               ptsy[i] = ( shift_x * sin(0-ref_yaw) ) + ( shift_y * cos(0-ref_yaw) );
-              //std::cout << "stpy[" << i << "] : " << ptsy[i] << std::endl;
+              std::cout << "stpy[" << i << "] : " << ptsy[i] << std::endl;
             }
             
             // make spline
@@ -312,13 +300,10 @@ int main() {
             trajectories_y.push_back(traj_y);
           }
           
-          // choose lowest cost trajectory (lane)
-          std::vector<double>::iterator iter = std::min_element(costs.begin(), costs.end());
-          size_t index = std::distance(costs.begin(), iter);
-          std::cout << "lowest cost lane : " << index << std::endl;
-          next_x_vals = trajectories_x[index];
-          next_y_vals = trajectories_y[index];
-          lane = index;
+          // choose lowest cost lane
+          
+          next_x_vals = trajectories_x[lane];
+          next_y_vals = trajectories_y[lane];
           
           std::cout << "next_x : " << int(next_x_vals[0]) << "," << int(next_x_vals[1]) << "," << int(next_x_vals[2]) << std::endl;
           std::cout << "next_y : " << int(next_y_vals[0]) << "," << int(next_y_vals[1]) << "," << int(next_y_vals[2]) <<std::endl;

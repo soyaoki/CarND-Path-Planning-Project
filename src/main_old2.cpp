@@ -152,6 +152,7 @@ int main() {
             // left lane sensing
             if ( abs(s - car_s_now) < 30 && d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2) )
             {
+              left_lane = false;
               if ((lane-1)>=0)
               {
                 costs[lane-1] = costs[lane-1]+20;
@@ -161,6 +162,7 @@ int main() {
             // right lane sensing
             if ( abs(s - car_s_now) < 30 &&  d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2) )
             {
+              right_lane = false;
               if (lane+1<=2)
               {
                 costs[lane+1] = costs[lane+1]+20;
@@ -174,7 +176,18 @@ int main() {
               if ( check_car_s > car_s && (check_car_s - car_s) < 30 ) 
               {
                 costs[lane] = costs[lane]+10;
-                too_close = true;
+                if (left_lane == true && lane >= 1)
+                { 
+                  lane = lane - 1;
+                }
+                else if (right_lane == true && lane <= 1)
+                { 
+                  lane = lane + 1;
+                }
+                else
+                {
+                  too_close = true;
+                }
               }
             }
           }
