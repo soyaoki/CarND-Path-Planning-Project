@@ -17,7 +17,7 @@ double ref_vel = 0.0; // target velocity
 bool too_close = false; // deacc flag
 int lane = 1; // left : 0, middle : 1, right : 2;
 vector<vector<double>> trajectories; // trajectries
-bool start_flg=true; //keep current lane from start to over 30mph
+bool start_flg = true; //keep current lane from start to over 30mph
 
 int main() {
   uWS::Hub h;
@@ -110,10 +110,10 @@ int main() {
           std::cout << "car_s : " << car_s << std::endl;
           std::cout << "car_d : " << car_d << std::endl;
           std::cout << "car_speed : " << car_speed  << std::endl;
+          std::cout << "lane : " << lane << std::endl;
           
           int prev_size = previous_path_x.size(); // number of previous path existing
           std::cout << "prev_size : " << prev_size << std::endl;
-          too_close = false;
           
           // if previous path exists
           double car_s_now = car_s;
@@ -122,85 +122,16 @@ int main() {
             car_s = end_path_s;
           }
           
-          // trajectory costs
-          // costs[0]：left lane
-          // costs[1]：middle lane
-          // costs[2]：right lane
-          vector<double> costs{0,0,0};
-          
-          if (lane==0){
-            costs[lane] = -1;
-            costs[2] = 999;
-          } else if (lane==1)
-          {
-            costs[lane] = -1;
-          } else if (lane==2)
-          {
-            costs[lane] = -1;
-            costs[0]=999;
-          }
-          
-          // sensing aroud
-          for (int i = 0; i < sensor_fusion.size(); i++)
-          {
-            float d = sensor_fusion[i][6];
-            float s = sensor_fusion[i][5];
-            double vx = sensor_fusion[i][3];
-            double vy = sensor_fusion[i][4];
-            double check_speed = sqrt(vx*vx+vy*vy);
-            std::cout << "i : " << i << ", d : " << d << ", s : " << s << ", v : " << check_speed << std::endl;
-            double check_car_s = sensor_fusion[i][5];
-            
-            // predict front car's position in future
-            check_car_s += ((double)prev_size*.02*check_speed);
-            
-            // left lane sensing
-            if ( d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2) )
-            {
-              if ( car_s_now < check_car_s && check_car_s < car_s+30 )
-              {
-                if ((lane-1)>=0)
-                {
-                  costs[lane-1] = costs[lane-1]+20;
-                }
-              }
-            }
-            
-            // right lane sensing
-            if ( d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2) )
-            {
-              if ( car_s_now < check_car_s && check_car_s < car_s+30 )
-              {
-                if (lane+1<=2)
-                {
-                  costs[lane+1] = costs[lane+1]+20;
-                }
-              }
-            }
-            
-            // current lane sensing
-            if ( d < (2+(4*lane)+2) && d > (2+(4*lane)-2) )
-            { 
-              // other vehicle exists in front of and near ego vehicle 
-              if ( check_car_s > car_s && (check_car_s - car_s) < 30 ) 
-              {
-                costs[lane] = costs[lane]+10;
-                too_close = true;
-              }
-            }
-          }
-          
-          std::cout << "lane : " << lane << std::endl;
-          
           if(too_close) // preceding vehicle exists
           {
             ref_vel -= .224; //deacc
+            too_close = false;
           }
           else if(ref_vel < 49.5) // under target velocity
           {
             ref_vel += .224; //acc
           }
-          
+                                
           std::cout << "ref_vel: " << ref_vel << std::endl;
 
           // generate 3 trajectories
@@ -319,6 +250,74 @@ int main() {
             // generate 3 trajectories
             trajectories_x.push_back(traj_x);
             trajectories_y.push_back(traj_y);
+          }
+          
+          // trajectory costs
+          // costs[0]：left lane
+          // costs[1]：middle lane
+          // costs[2]：right lane
+          vector<double> costs{0,0,0};
+          
+          if (lane==0){
+            costs[lane] = -1;
+            costs[2] = 999;
+          } else if (lane==1)
+          {
+            costs[lane] = -1;
+          } else if (lane==2)
+          {
+            costs[lane] = -1;
+            costs[0]=999;
+          }
+          
+          // sensing aroud
+          for (int i = 0; i < sensor_fusion.size(); i++)
+          {
+            float d = sensor_fusion[i][6];
+            float s = sensor_fusion[i][5];
+            double vx = sensor_fusion[i][3];
+            double vy = sensor_fusion[i][4];
+            double check_speed = sqrt(vx*vx+vy*vy);
+            std::cout << "i : " << i << ", d : " << d << ", s : " << s << ", v : " << check_speed << std::endl;
+            double check_car_s = sensor_fusion[i][5];
+            
+            // predict front car's position in future
+            check_car_s += ((double)prev_size*.02*check_speed);
+            
+            // left lane sensing
+            if ( d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2) )
+            {
+              if ( car_s_now < check_car_s && check_car_s < car_s+30 )
+              {
+                if ((lane-1)>=0)
+                {
+                  costs[lane-1] = costs[lane-1]+20;
+                }
+              }
+            }
+            
+            // right lane sensing
+            if ( d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2) )
+            {
+              if ( car_s_now < check_car_s && check_car_s < car_s+30 )
+              {
+                if (lane+1<=2)
+                {
+                  costs[lane+1] = costs[lane+1]+20;
+                }
+              }
+            }
+            
+            // current lane sensing
+            if ( d < (2+(4*lane)+2) && d > (2+(4*lane)-2) )
+            { 
+              // other vehicle exists in front of and near ego vehicle 
+              if ( check_car_s > car_s && (check_car_s - car_s) < 30 ) 
+              {
+                costs[lane] = costs[lane]+10;
+                too_close = true;
+              }
+            }
           }
           
           // choose lowest cost trajectory (lane)
